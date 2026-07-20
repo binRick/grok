@@ -1,0 +1,5 @@
+# The installed grok binary + downloads live here (fetched by install.sh).
+# They are large (~120 MB) and machine/version specific — never commit them.
+/.grok/
+
+.DS_Store

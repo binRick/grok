@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#
+# bin/grok — thin launcher for the repo-local Grok Build install.
+#
+# Runs the `grok` binary that ./install.sh placed under .grok/bin/, so you can
+# use this deployment without adding anything to your PATH. Symlink or alias it
+# if you want a global `grok`:
+#
+#   ln -s "$(pwd)/bin/grok" ~/.local/bin/grok
+#
+set -euo pipefail
+
+# Resolve this script's real location, following symlinks.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SHIM_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+REPO_ROOT="$(cd -P "$SHIM_DIR/.." && pwd)"
+
+BIN="${GROK_BIN_DIR:-$REPO_ROOT/.grok/bin}/grok"
+
+if [ ! -x "$BIN" ]; then
+  printf '\033[31mgrok is not installed yet.\033[0m\n' >&2
+  printf 'Install it with:  make install    (or)   ./install.sh\n' >&2
+  exit 127
+fi
+
+exec "$BIN" "$@"

@@ -12,6 +12,22 @@ VERSION ?=
 
 .DEFAULT_GOAL := help
 
+## bootstrap: fresh clone -> working local agent (preflight + grok + gemma4 + verify)
+bootstrap:
+	@./ollama.sh preflight || { \
+	  echo ""; \
+	  echo "Fix the items above first. Nothing has been installed."; \
+	  exit 1; \
+	}
+	@$(MAKE) --no-print-directory install
+	@./ollama.sh setup
+	@echo ""
+	@echo "Ready. Start the agent with:  make run"
+
+## preflight: check this host can run the local setup (installs nothing)
+preflight:
+	@./ollama.sh preflight
+
 ## install: download + install the grok binary into ./.grok/bin (idempotent)
 install:
 	@GROK_CHANNEL=$(CHANNEL) ./install.sh $(VERSION)
@@ -90,5 +106,6 @@ help:
 	echo; echo "Vars:  CHANNEL=stable|alpha   VERSION=X.Y.Z   (e.g. make install CHANNEL=alpha)"; \
 	echo "       GROK_OLLAMA_MODEL=gemma4:12b  GROK_OLLAMA_CTX=32768   (for make ollama)"
 
-.PHONY: install update run login version help-grok doctor uninstall clean guard help \
+.PHONY: bootstrap preflight install update run login version help-grok doctor \
+        uninstall clean guard help \
         ollama ollama-models ollama-test ollama-doctor ollama-uninstall

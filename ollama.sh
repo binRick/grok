@@ -19,7 +19,8 @@
 #      the local model. Fully reversible with `./ollama.sh uninstall`.
 #
 # Usage:
-#   ./ollama.sh                 # setup: pull + derive + generate + install + verify
+#   ./ollama.sh                 # setup: preflight + pull + derive + install + verify
+#   ./ollama.sh preflight       # check host readiness, with fixes for what is missing
 #   ./ollama.sh generate        # regenerate ./ollama.toml from local models only
 #   ./ollama.sh install         # install ./ollama.toml into the Grok config
 #   ./ollama.sh uninstall       # remove the managed block from the Grok config
@@ -43,6 +44,10 @@ MODEL="${GROK_OLLAMA_MODEL:-gemma4:12b}"
 CTX="${GROK_OLLAMA_CTX:-32768}"
 MODEL_ID="${GROK_OLLAMA_ID:-gemma4}"
 MAKE_DEFAULT="${GROK_OLLAMA_DEFAULT:-1}"
+
+# gemma4 refuses to load on older runtimes ("requires a newer version of
+# Ollama"), and the error arrives only after the pull. Check it up front.
+MIN_OLLAMA="${GROK_OLLAMA_MIN_VERSION:-0.30.5}"
 
 # Ollama's OpenAI-compatible surface. OLLAMA_HOST is often set bare (host:port),
 # so normalise it to a URL.
@@ -90,7 +95,182 @@ require_ollama() {
   need curl
   need python3
   ollama_up || die "cannot reach Ollama at $HOST
-       Start it with:  ollama serve      (or)   brew services start ollama"
+       Start it with:  ollama serve      (or)   brew services start ollama
+       Full diagnosis:  ./ollama.sh preflight"
+}
+
+# --- 0. preflight --------------------------------------------------------------
+
+# Everything below reports what to DO about a failure, not just that it failed —
+# this is the script a fresh machine (or an agent driving one) hits first.
+
+os_name() { case "$(uname -s)" in Darwin) echo macos ;; Linux) echo linux ;; *) echo other ;; esac; }
+
+# Pure-awk semver compare so this works before we have confirmed python3.
+version_ge() {
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    na = split(a, x, "."); nb = split(b, y, ".")
+    n = (na > nb) ? na : nb
+    for (i = 1; i <= n; i++) {
+      xi = (i <= na) ? x[i] + 0 : 0; yi = (i <= nb) ? y[i] + 0 : 0
+      if (xi > yi) exit 0
+      if (xi < yi) exit 1
+    }
+    exit 0
+  }'
+}
+
+install_ollama_hint() {
+  case "$(os_name)" in
+    macos) printf '  brew install ollama && brew services start ollama\n  (or download the app: https://ollama.com/download)\n' ;;
+    linux) printf '  curl -fsSL https://ollama.com/install.sh | sh\n  (offline/restricted networks: grab the tarball from https://github.com/ollama/ollama/releases)\n' ;;
+    *)     printf '  https://ollama.com/download\n' ;;
+  esac
+}
+
+upgrade_ollama_hint() {
+  case "$(os_name)" in
+    macos) printf '  brew upgrade ollama && brew services restart ollama\n' ;;
+    linux) printf '  curl -fsSL https://ollama.com/install.sh | sh && sudo systemctl restart ollama\n' ;;
+    *)     printf '  https://ollama.com/download\n' ;;
+  esac
+}
+
+free_disk_gb() { df -Pk "$SCRIPT_DIR" 2>/dev/null | awk 'NR==2 {printf "%.0f", $4/1024/1024}'; }
+
+total_ram_gb() {
+  case "$(os_name)" in
+    macos) awk -v b="$(sysctl -n hw.memsize 2>/dev/null || echo 0)" 'BEGIN {printf "%.0f", b/1024/1024/1024}' ;;
+    linux) awk '/MemTotal/ {printf "%.0f", $2/1024/1024}' /proc/meminfo 2>/dev/null ;;
+    *)     echo 0 ;;
+  esac
+}
+
+# Download size straight from the registry, so the disk check is about the model
+# actually requested rather than a guess. Empty when it cannot be determined.
+model_size_gb() {
+  case "$MODEL" in */*) return ;; esac          # non-library models: unknown path
+  local name="${MODEL%%:*}" tag="${MODEL#*:}"
+  [ "$tag" = "$MODEL" ] && tag=latest
+  curl -fsS -m 15 "https://registry.ollama.ai/v2/library/$name/manifests/$tag" 2>/dev/null \
+    | python3 -c 'import json,sys
+try:
+    d = json.load(sys.stdin)
+    print("%.1f" % (sum(l["size"] for l in d["layers"]) / 1e9))
+except Exception:
+    pass' 2>/dev/null || true
+}
+
+cmd_preflight() {
+  local fail=0 warned=0
+  printf 'platform:         %s/%s\n' "$(os_name)" "$(uname -m)"
+
+  # --- required tooling ---
+  for t in curl python3 awk; do
+    if command -v "$t" >/dev/null 2>&1; then
+      printf '%-17s ok\n' "$t:"
+    else
+      printf '%-17s \033[31mMISSING\033[0m — install it with your package manager\n' "$t:"
+      fail=1
+    fi
+  done
+
+  # --- ollama binary ---
+  if command -v ollama >/dev/null 2>&1; then
+    # `ollama --version` also emits a connection warning when the server is
+    # down, so pull the version out rather than echoing the first line.
+    local cv
+    cv="$(ollama --version 2>/dev/null | awk '/version is/ {print $NF; exit}')"
+    printf '%-17s ok (client %s)\n' "ollama binary:" "${cv:-unknown}"
+  else
+    printf '%-17s \033[31mMISSING\033[0m — install it:\n' "ollama binary:"
+    install_ollama_hint
+    fail=1
+  fi
+
+  # --- ollama server + version (the server's version is the one that matters) ---
+  if ollama_up; then
+    local sv
+    sv="$(curl -fsS -m 5 "$HOST/api/version" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' 2>/dev/null || echo 0)"
+    if version_ge "$sv" "$MIN_OLLAMA"; then
+      printf '%-17s ok (v%s at %s)\n' "ollama server:" "$sv" "$HOST"
+    else
+      printf '%-17s \033[31mv%s is too old\033[0m — %s needs >= %s. Upgrade:\n' "ollama server:" "$sv" "$MODEL" "$MIN_OLLAMA"
+      upgrade_ollama_hint
+      fail=1
+    fi
+  else
+    printf '%-17s \033[31mUNREACHABLE\033[0m at %s — start it:\n' "ollama server:" "$HOST"
+    case "$(os_name)" in
+      macos) printf '  brew services start ollama    (or)   ollama serve\n' ;;
+      linux) printf '  sudo systemctl start ollama   (or)   ollama serve\n' ;;
+      *)     printf '  ollama serve\n' ;;
+    esac
+    fail=1
+  fi
+
+  # --- capacity ---
+  local need_gb disk ram
+  need_gb="$(model_size_gb)"
+  disk="$(free_disk_gb)"; ram="$(total_ram_gb)"
+
+  # Already downloaded? Then its size is not a constraint any more, and on an
+  # air-gapped host the registry lookup will not work anyway.
+  local have_model=0
+  ollama_up && curl -fsS -m 10 "$HOST/api/show" -d "{\"model\":\"$MODEL\"}" >/dev/null 2>&1 && have_model=1
+
+  if [ -z "$need_gb" ] || [ "$have_model" -eq 1 ]; then
+    # Unknown size: report the numbers plainly instead of silently skipping the
+    # check, so a restricted-network host still gets the information.
+    local note="size of $MODEL unknown, registry unreachable — check manually"
+    [ "$have_model" -eq 1 ] && note="$MODEL is already downloaded"
+    printf '%-17s %s GB free — %s\n' "disk:" "${disk:-?}" "$note"
+    printf '%-17s %s GB\n' "memory:" "${ram:-?}"
+  else
+    # Headroom for the derived manifest, the KV cache spilling to disk, and
+    # simply not wedging the machine at 100% full.
+    local want
+    want="$(awk -v n="$need_gb" 'BEGIN {printf "%.0f", n + 5}')"
+    if [ "${disk:-0}" -ge "$want" ] 2>/dev/null; then
+      printf '%-17s ok (%s GB free; %s needs ~%s GB)\n' "disk:" "$disk" "$MODEL" "$need_gb"
+    else
+      printf '%-17s \033[33m%s GB free\033[0m — %s needs ~%s GB plus headroom.\n' "disk:" "$disk" "$MODEL" "$need_gb"
+      printf '  Free space, or pick a smaller model:  GROK_OLLAMA_MODEL=gemma4:e4b-it-qat make ollama\n'
+      printf '  Reclaim from Ollama:  ollama list   then   ollama rm <model>\n'
+      warned=1
+    fi
+
+    local want_ram
+    want_ram="$(awk -v n="$need_gb" 'BEGIN {printf "%.0f", n + 4}')"
+    if [ "${ram:-0}" -eq 0 ] 2>/dev/null; then
+      printf '%-17s unknown\n' "memory:"
+    elif [ "$ram" -ge "$want_ram" ] 2>/dev/null; then
+      printf '%-17s ok (%s GB)\n' "memory:" "$ram"
+    else
+      printf '%-17s \033[33m%s GB\033[0m — %s wants ~%s GB with a %sK context.\n' "memory:" "$ram" "$MODEL" "$want_ram" "$((CTX / 1024))"
+      printf '  It will still run, but may spill to CPU and get slow. Smaller model or\n'
+      printf '  smaller context:  GROK_OLLAMA_CTX=8192 make ollama\n'
+      warned=1
+    fi
+  fi
+
+  # --- grok itself ---
+  if [ -x "$GROK_BIN" ]; then
+    printf '%-17s ok (%s)\n' "grok binary:" "$("$GROK_BIN" --version 2>/dev/null)"
+  else
+    printf '%-17s \033[33mnot installed\033[0m — run: make install\n' "grok binary:"
+    warned=1
+  fi
+
+  echo
+  if [ "$fail" -ne 0 ]; then
+    die "preflight failed — fix the items above, then re-run: ./ollama.sh preflight"
+  fi
+  if [ "$warned" -ne 0 ]; then
+    warn "preflight passed, with the warnings above — setup will run, but read them first"
+  else
+    ok "preflight passed"
+  fi
 }
 
 # --- model list + capabilities -------------------------------------------------
@@ -389,6 +569,8 @@ cmd_doctor() {
 }
 
 cmd_setup() {
+  cmd_preflight
+  echo >&2
   cmd_pull
   cmd_generate
   cmd_install
@@ -401,6 +583,7 @@ cmd_setup() {
 
 case "${1:-setup}" in
   setup|"")   cmd_setup ;;
+  preflight)  cmd_preflight ;;
   pull)       cmd_pull ;;
   generate)   cmd_generate ;;
   install)    cmd_generate; cmd_install ;;
@@ -408,6 +591,7 @@ case "${1:-setup}" in
   doctor)     cmd_doctor ;;
   test)       shift; cmd_test "${1:-$MODEL_ID}" ;;
   -h|--help|help)
-    sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//' ;;
-  *) die "unknown command: $1  (try: setup, generate, install, uninstall, doctor, test)" ;;
+    sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown command: $1
+       try: setup, preflight, pull, generate, install, uninstall, doctor, test" ;;
 esac

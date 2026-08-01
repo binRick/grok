@@ -99,10 +99,15 @@ Prefer to skip the account entirely? See [Local models with Ollama](#local-model
 Grok talks to any OpenAI-compatible endpoint, and [Ollama](https://ollama.com) serves one at `:11434/v1`. That's enough to run the whole agent — file edits, shell commands, todos, sessions — against a model hosted on your own hardware. No xAI account, no API key, nothing leaving the machine.
 
 ```bash
-make install      # the grok binary (if you haven't already)
-make ollama       # pull gemma4, wire it in, and verify with a real agent test
+make bootstrap    # fresh clone → working local agent (checks the host first)
 make run          # …and you're driving a local model
 ```
+
+`make bootstrap` is the whole path: it preflights the machine, installs the grok binary, pulls the model, wires it up, and verifies. If the host isn't ready it stops **before installing anything** and tells you exactly what to fix. Check readiness alone with `make preflight`.
+
+Already have the binary? `make ollama` does just the model half.
+
+> Setting this up on another machine — or handing it to a coding agent to set up — is covered step by step in **[AGENTS.md](AGENTS.md)**, including verification, restricted networks, and offline installs. Grok itself loads that file as project rules, so the local agent knows how its own setup works.
 
 `make ollama` is idempotent, and it verifies rather than assumes: the last step runs an actual agentic turn (the model must use its tools to read a file and report what's inside) and fails loudly if the model can't.
 
@@ -266,10 +271,11 @@ Because the wrapper is non-invasive, that's all there is to remove. If you also 
 ```
 .
 ├── install.sh     # repo-local, non-invasive installer (also handles updates)
-├── ollama.sh      # wires grok up to locally-hosted models via Ollama
+├── ollama.sh      # preflight, model pull, config generation, verification
 ├── ollama.toml    # generated: the [model.*] block installed into grok's config
 ├── bin/grok       # launcher shim → runs the installed binary
-├── Makefile       # make install / login / run / ollama / doctor / uninstall
+├── Makefile       # make bootstrap / install / run / ollama / doctor / uninstall
+├── AGENTS.md      # setup guide for another machine or a coding agent
 ├── README.md      # this file
 └── .grok/         # (git-ignored) the downloaded binary + cache
 ```
@@ -285,6 +291,8 @@ GROK_HOME="$(pwd)/.grok/home" ./bin/grok
 
 | Target | Description |
 |---|---|
+| `make bootstrap` | Fresh clone → working local agent (preflight + install + wire up + verify) |
+| `make preflight` | Check the host is ready (installs nothing) |
 | `make install` | Download + install grok into `./.grok/bin` |
 | `make update` | Re-fetch and install the latest version |
 | `make run` | Launch the interactive TUI |

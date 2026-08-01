@@ -176,18 +176,22 @@ better; see below.
 ## CPU-only hosts
 
 A plain VM with no GPU — which many managed and compliance-controlled
-environments are — will run this, but not well. Measured on the same 12B model
-and the same editing task:
+environments are — will run this, but slowly. Measured on the same 12B model and
+the same one-line editing task:
 
-| Host | Time for one small edit | Outcome |
-|---|---|---|
-| Apple M4, GPU | ~200 s | Correct |
-| 10-core CPU, no GPU | ~900 s | **Claimed success, changed nothing** |
+| Host | Time for one small edit |
+|---|---|
+| Apple M4, GPU | ~200 s |
+| 10-core CPU, no GPU | 640–900 s |
 
-The CPU run is not merely slower. At roughly 1–6 tokens/sec the model produced a
-confident "I have updated the file" while the file was untouched. Slowness and
-wrongness arrive together, which is why `make ollama-test` checks the file
-rather than the reply.
+That is 3–4x slower, at roughly 1–6 tokens/sec, and it compounds: every turn in
+a multi-step task pays it again. Usable for a single narrow edit; painful for
+real work.
+
+One of the two CPU runs also reported an edit it had not made — but the same
+failure has been seen on GPU, so treat it as the model being unreliable rather
+than as something CPU causes. It is the reason `make ollama-test` checks the
+file instead of the reply.
 
 If `ollama ps` shows `100% CPU`, use a small model instead of a large one:
 

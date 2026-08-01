@@ -1,0 +1,100 @@
+# >>> grok-ollama (managed by ollama.sh — do not edit inside) >>>
+#
+# Local models served by Ollama at http://localhost:11434
+# Regenerate with:  ./ollama.sh generate
+#
+# Only tool-capable models are listed — Grok needs tool calling to edit
+# files and run commands. context_window is what Ollama actually serves
+# (32K), not what the model advertises, so auto-compaction fires before
+# the real window overflows.
+
+[models]
+default = "gemma4"
+
+[model.gemma4]
+model = "grok-gemma4-12b-32k"
+base_url = "http://localhost:11434/v1"
+name = "Gemma4 12B (local)"
+description = "Locally hosted via Ollama, 32K context (vision, thinking)"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-gemma4-12b]
+model = "gemma4:12b"
+base_url = "http://localhost:11434/v1"
+name = "Gemma4 12B (Ollama)"
+description = "Locally hosted via Ollama (vision, thinking)"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-qwen3-8b]
+model = "qwen3:8b"
+base_url = "http://localhost:11434/v1"
+name = "Qwen3 8B (Ollama)"
+description = "Locally hosted via Ollama (thinking)"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-qwen3-14b]
+model = "qwen3:14b"
+base_url = "http://localhost:11434/v1"
+name = "Qwen3 14B (Ollama)"
+description = "Locally hosted via Ollama (thinking)"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-qwen2-5-coder-3b]
+model = "qwen2.5-coder:3b"
+base_url = "http://localhost:11434/v1"
+name = "Qwen2.5 Coder 3B (Ollama)"
+description = "Locally hosted via Ollama"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-llama3-2-3b]
+model = "llama3.2:3b"
+base_url = "http://localhost:11434/v1"
+name = "Llama3.2 3B (Ollama)"
+description = "Locally hosted via Ollama"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-deepseek-r1-1-5b]
+model = "deepseek-r1:1.5b"
+base_url = "http://localhost:11434/v1"
+name = "Deepseek R1 1.5B (Ollama)"
+description = "Locally hosted via Ollama (thinking)"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-llama3-2-1b]
+model = "llama3.2:1b"
+base_url = "http://localhost:11434/v1"
+name = "Llama3.2 1B (Ollama)"
+description = "Locally hosted via Ollama"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+[model.ollama-qwen3-0-6b]
+model = "qwen3:0.6b"
+base_url = "http://localhost:11434/v1"
+name = "Qwen3 0.6B (Ollama)"
+description = "Locally hosted via Ollama (thinking)"
+api_key = "ollama"
+api_backend = "chat_completions"
+context_window = 32768
+
+# Skipped (no tool-calling support, cannot drive the agent loop):
+#   gemma3:1b
+#   moondream:latest
+#   gemma3:270m
+
+# <<< grok-ollama <<<

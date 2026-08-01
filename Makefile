@@ -28,6 +28,26 @@ run: guard
 login: guard
 	@"$(GROK)" login
 
+## ollama: run grok on a local model via Ollama (pull + wire up + verify)
+ollama: guard
+	@./ollama.sh setup
+
+## ollama-models: refresh the local model list in grok's config
+ollama-models:
+	@./ollama.sh install
+
+## ollama-test: end-to-end agent test against the local model
+ollama-test: guard
+	@./ollama.sh test
+
+## ollama-doctor: health check for the local Ollama integration
+ollama-doctor:
+	@./ollama.sh doctor
+
+## ollama-uninstall: unwire Ollama from grok's config (models are kept)
+ollama-uninstall:
+	@./ollama.sh uninstall
+
 ## version: print the installed grok version
 version: guard
 	@"$(GROK)" --version
@@ -43,6 +63,7 @@ doctor:
 	  echo "binary:    $(GROK)"; \
 	  echo "version:   $$($(GROK) --version 2>/dev/null)"; \
 	  echo "auth:      $$([ -f $$HOME/.grok/auth.json ] && echo 'logged in (~/.grok/auth.json)' || echo 'not logged in — run: make login')"; \
+	  echo "local:     $$(grep -qs 'grok-ollama' $${GROK_HOME:-$$HOME/.grok}/config.toml && echo 'Ollama models wired in — see: make ollama-doctor' || echo 'no local models — run: make ollama')"; \
 	else \
 	  echo "binary:    NOT INSTALLED — run: make install"; \
 	fi
@@ -65,7 +86,9 @@ help:
 	@echo "Grok Build deployment — make targets:"; echo; \
 	grep -hE '^## [a-z]' $(MAKEFILE_LIST) \
 	  | sed -E 's/^## ([a-z-]+): /\1|/' \
-	  | awk -F'|' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'; \
-	echo; echo "Vars:  CHANNEL=stable|alpha   VERSION=X.Y.Z   (e.g. make install CHANNEL=alpha)"
+	  | awk -F'|' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'; \
+	echo; echo "Vars:  CHANNEL=stable|alpha   VERSION=X.Y.Z   (e.g. make install CHANNEL=alpha)"; \
+	echo "       GROK_OLLAMA_MODEL=gemma4:12b  GROK_OLLAMA_CTX=32768   (for make ollama)"
 
-.PHONY: install update run login version help-grok doctor uninstall clean guard help
+.PHONY: install update run login version help-grok doctor uninstall clean guard help \
+        ollama ollama-models ollama-test ollama-doctor ollama-uninstall

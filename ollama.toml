@@ -19,6 +19,7 @@ description = "Locally hosted via Ollama, 32K context (vision, thinking)"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-gemma4-12b]
 model = "gemma4:12b"
@@ -28,6 +29,7 @@ description = "Locally hosted via Ollama (vision, thinking)"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-qwen3-8b]
 model = "qwen3:8b"
@@ -37,6 +39,7 @@ description = "Locally hosted via Ollama (thinking)"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-qwen3-14b]
 model = "qwen3:14b"
@@ -46,6 +49,7 @@ description = "Locally hosted via Ollama (thinking)"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-qwen2-5-coder-3b]
 model = "qwen2.5-coder:3b"
@@ -55,6 +59,7 @@ description = "Locally hosted via Ollama"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-llama3-2-3b]
 model = "llama3.2:3b"
@@ -64,6 +69,7 @@ description = "Locally hosted via Ollama"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-deepseek-r1-1-5b]
 model = "deepseek-r1:1.5b"
@@ -73,6 +79,7 @@ description = "Locally hosted via Ollama (thinking)"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-llama3-2-1b]
 model = "llama3.2:1b"
@@ -82,6 +89,7 @@ description = "Locally hosted via Ollama"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 [model.ollama-qwen3-0-6b]
 model = "qwen3:0.6b"
@@ -91,6 +99,7 @@ description = "Locally hosted via Ollama (thinking)"
 api_key = "ollama"
 api_backend = "chat_completions"
 context_window = 32768
+inference_idle_timeout_secs = 1800
 
 # Skipped (no tool-calling support, cannot drive the agent loop):
 #   gemma3:1b

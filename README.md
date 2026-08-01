@@ -156,7 +156,7 @@ A local 12B model is not grok-4.5, and it's fair to know that going in. Expect i
 
 That's the characteristic local-model failure: not gibberish, but a confident summary that doesn't match the diff. Treat its report as a claim, not a result. `git diff` after every task, prefer `--permission-mode default` (the one that asks) over `auto` on code you care about, and keep changes small enough to eyeball.
 
-**You want a GPU.** The same 12B model on the same one-line editing task took ~200s on an M4's GPU and 640–900s on a 10-core CPU with no GPU — 3–4x slower, and paid again on every turn of a multi-step task. If `ollama ps` says `100% CPU`, drop to a ~4B model (`GROK_OLLAMA_MODEL=gemma4:e4b-it-qat make ollama`), which is usable for narrow tasks in a way a 12B is not. `make ollama-test` warns you when a run is slow enough to mean this.
+**You want a GPU.** The same one-line editing task took ~200s on an M4's GPU and 640–1028s on a 10-core CPU with no GPU, and that cost is paid again on every turn. Worse, grok abandons a turn after 600s of silence from the model — a cloud-latency assumption that a CPU host blows through during prompt processing, before a single token appears. On a CPU-only box that killed *every* turn, including the one inside `make bootstrap`. The generated config now sets `inference_idle_timeout_secs = 1800` to compensate; `GROK_OLLAMA_IDLE_TIMEOUT=3600 make ollama` goes further. A smaller model does not fix this on its own — what matters is the length of the silence, not the tokens per second.
 
 Mixing is fine, and often the right call: the local models sit alongside xAI's in the same picker, so `Ctrl+M` switches between offline and frontier mid-session.
 
@@ -343,6 +343,7 @@ GROK_HOME="$(pwd)/.grok/home" ./bin/grok
 - **`does not support tool calling`** → that model can't drive the agent. Check with `ollama show <model>` and look for `tools` under Capabilities, then pick one that has it.
 - **The model rambles, loops, or ignores your files** → usually context exhaustion. Raise it (`GROK_OLLAMA_CTX=65536 make ollama`), `/compact` more often, or move to a larger model.
 - **Everything is very slow** → check the model fits in RAM with `ollama ps`; if it spilled to CPU, drop to a smaller model or a lower `GROK_OLLAMA_CTX`.
+- **`inference idle timeout after 600s with no chunks`** → the host is slow enough that grok gave up waiting mid-prompt-processing. The generated config already raises this to 1800s; go further with `GROK_OLLAMA_IDLE_TIMEOUT=3600 make ollama`.
 - **Want your xAI models back as the default** → `make ollama-uninstall`, or just `/model grok-4.5` for the session.
 
 ---

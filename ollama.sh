@@ -49,6 +49,13 @@ MAKE_DEFAULT="${GROK_OLLAMA_DEFAULT:-1}"
 # Ollama"), and the error arrives only after the pull. Check it up front.
 MIN_OLLAMA="${GROK_OLLAMA_MIN_VERSION:-0.30.5}"
 
+# Grok gives up on a turn after this many seconds without a chunk from the
+# model. Its 600s default assumes cloud latency; a local model on a slow host
+# can spend longer than that on prompt processing alone, before it emits a
+# single token, and the turn dies with "inference idle timeout". Measured on a
+# CPU-only box, this is not an edge case — it is most turns.
+IDLE_TIMEOUT="${GROK_OLLAMA_IDLE_TIMEOUT:-1800}"
+
 # Ollama's OpenAI-compatible surface. OLLAMA_HOST is often set bare (host:port),
 # so normalise it to a URL.
 HOST="${OLLAMA_HOST:-http://localhost:11434}"
@@ -353,7 +360,7 @@ cmd_generate() {
 
   MODEL="$MODEL" DERIVED="$derived" MODEL_ID="$MODEL_ID" CTX="$CTX" HOST="$HOST" \
   MAKE_DEFAULT="$MAKE_DEFAULT" BEGIN_MARK="$BEGIN_MARK" END_MARK="$END_MARK" \
-  SERVER_CTX="$SERVER_CTX" \
+  SERVER_CTX="$SERVER_CTX" IDLE_TIMEOUT="$IDLE_TIMEOUT" \
   python3 -c '
 import os, re, sys
 
@@ -401,6 +408,8 @@ def entry(gid, oname, caps, window, display, desc):
             "api_key = \"ollama\"",
             "api_backend = \"chat_completions\"",
             "context_window = %d" % window,
+            # The 600s default gives up on a slow host mid-prompt-processing.
+            "inference_idle_timeout_secs = %s" % os.environ["IDLE_TIMEOUT"],
             ""]
 
 # The primary: the derived big-context build of the requested model.

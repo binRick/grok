@@ -176,30 +176,50 @@ better; see below.
 ## CPU-only hosts
 
 A plain VM with no GPU — which many managed and compliance-controlled
-environments are — will run this, but slowly. Measured on the same 12B model and
-the same one-line editing task:
+environments are — will run this, but slowly. Measured on the same one-line
+editing task, 10 CPU cores, no GPU:
 
-| Host | Time for one small edit |
-|---|---|
-| Apple M4, GPU | ~200 s |
-| 10-core CPU, no GPU | 640–900 s |
+| Host | Model | Time |
+|---|---|---|
+| Apple M4, GPU | gemma4:12b | ~200 s |
+| 10-core CPU | gemma4:12b | 640–900 s |
+| 10-core CPU | gemma4:e4b-it-qat | 675–1028 s |
 
-That is 3–4x slower, at roughly 1–6 tokens/sec, and it compounds: every turn in
-a multi-step task pays it again. Usable for a single narrow edit; painful for
-real work.
+Roughly 1–6 tokens/sec, and it compounds: every turn of a multi-step task pays
+it again.
 
-One of the two CPU runs also reported an edit it had not made — but the same
-failure has been seen on GPU, so treat it as the model being unreliable rather
-than as something CPU causes. It is the reason `make ollama-test` checks the
-file instead of the reply.
+**The thing that actually breaks on CPU is a timeout, not the model.** Grok
+abandons a turn after 600 s without receiving a chunk, which assumes cloud
+latency. On a CPU host that elapses during prompt processing, before the model
+has emitted anything, and the turn dies with:
 
-If `ollama ps` shows `100% CPU`, use a small model instead of a large one:
+```
+Internal error: "inference idle timeout after 600s with no chunks"
+```
+
+On a CPU-only box this hit every single turn, including the one inside
+`make bootstrap`, which failed. Note that a *smaller* model did not help — e4b
+timed out where the 12B had squeaked through, because what matters is the length
+of the silence, not the tokens per second.
+
+The generated config therefore sets `inference_idle_timeout_secs = 1800` on
+every model. Raise it further on a very slow host:
+
+```bash
+GROK_OLLAMA_IDLE_TIMEOUT=3600 make ollama
+```
+
+With that in place a CPU host works — slowly. If you want it merely slow rather
+than unusable, a smaller model and context still helps:
 
 ```bash
 GROK_OLLAMA_MODEL=gemma4:e4b-it-qat GROK_OLLAMA_CTX=8192 make ollama
 ```
 
-A 4B model on CPU is usable for narrow tasks. A 12B is not.
+One CPU run also reported an edit it had not made — but the same failure has
+been seen on GPU, so treat it as the model being unreliable rather than as
+something CPU causes. It is why `make ollama-test` checks the file, not the
+reply.
 
 ## Choosing a different model
 
@@ -331,6 +351,7 @@ auto_update = false
 |---|---|
 | `requires a newer version of Ollama` | Upgrade Ollama **and restart the server** (see above) |
 | `This version requires zstd for extraction` | Ollama's Linux installer — `sudo apt-get install -y zstd`, then re-run it |
+| `inference idle timeout after 600s with no chunks` | Host too slow for the default timeout — `GROK_OLLAMA_IDLE_TIMEOUT=3600 make ollama`. See [CPU-only hosts](#cpu-only-hosts) |
 | `cannot reach Ollama` | `ollama serve`, or `brew services start ollama` / `systemctl start ollama` |
 | `does not support tool calling` | Pick a model whose `ollama show` lists `tools` |
 | `grok is not installed yet` | `make install` |

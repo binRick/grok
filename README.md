@@ -336,6 +336,7 @@ GROK_HOME="$(pwd)/.grok/home" ./bin/grok
 ### Local models
 
 - **`requires a newer version of Ollama`** → `brew upgrade ollama && brew services restart ollama` (or reinstall from [ollama.com/download](https://ollama.com/download)). New models regularly need a newer runtime than you have.
+- **`This version requires zstd for extraction`** (Linux) → Ollama's installer needs `zstd`, which minimal images don't ship: `sudo apt-get install -y zstd`, then re-run the installer.
 - **`cannot reach Ollama`** → start it: `ollama serve`, or `brew services start ollama`. Non-default host? `OLLAMA_HOST=host:port make ollama`.
 - **`does not support tool calling`** → that model can't drive the agent. Check with `ollama show <model>` and look for `tools` under Capabilities, then pick one that has it.
 - **The model rambles, loops, or ignores your files** → usually context exhaustion. Raise it (`GROK_OLLAMA_CTX=65536 make ollama`), `/compact` more often, or move to a larger model.

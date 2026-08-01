@@ -49,7 +49,8 @@ you can prepare the host up front.
 
 | Requirement | Why | If missing |
 |---|---|---|
-| `curl`, `bash`, `python3`, `awk` | Install + config generation | System package manager |
+| `curl`, `bash`, `python3`, `awk`, `make` | Install + config generation | System package manager |
+| `zstd` (Linux only) | Ollama's own installer needs it | `apt-get install -y zstd` |
 | **Ollama ≥ 0.30.5** | Older runtimes **cannot load gemma4** | See below |
 | ~13 GB free disk | 7.6 GB model + headroom | `ollama rm <unused-model>` |
 | ~12 GB RAM | Model weights + 32K context | Use a smaller model (below) |
@@ -61,9 +62,14 @@ Installing Ollama:
 # macOS
 brew install ollama && brew services start ollama
 
-# Linux
+# Linux — install zstd first, the Ollama installer requires it and stops without it
+sudo apt-get install -y zstd                # dnf install zstd / pacman -S zstd
 curl -fsSL https://ollama.com/install.sh | sh && sudo systemctl start ollama
 ```
+
+A minimal Linux image (a slim container, a fresh VM) will not have `zstd`, and
+the installer fails with `ERROR: This version requires zstd for extraction`
+rather than anything about Ollama. Verified on `debian:12-slim`.
 
 Upgrading it (the **server** version is what matters, so restart it after):
 
@@ -290,6 +296,7 @@ auto_update = false
 | Symptom | Cause and fix |
 |---|---|
 | `requires a newer version of Ollama` | Upgrade Ollama **and restart the server** (see above) |
+| `This version requires zstd for extraction` | Ollama's Linux installer — `sudo apt-get install -y zstd`, then re-run it |
 | `cannot reach Ollama` | `ollama serve`, or `brew services start ollama` / `systemctl start ollama` |
 | `does not support tool calling` | Pick a model whose `ollama show` lists `tools` |
 | `grok is not installed yet` | `make install` |

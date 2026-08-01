@@ -123,7 +123,7 @@ version_ge() {
 install_ollama_hint() {
   case "$(os_name)" in
     macos) printf '  brew install ollama && brew services start ollama\n  (or download the app: https://ollama.com/download)\n' ;;
-    linux) printf '  curl -fsSL https://ollama.com/install.sh | sh\n  (offline/restricted networks: grab the tarball from https://github.com/ollama/ollama/releases)\n' ;;
+    linux) printf '  sudo apt-get install -y zstd     # dnf/pacman equivalent elsewhere\n  curl -fsSL https://ollama.com/install.sh | sh\n  (the installer needs zstd and stops without it; on a restricted\n   network take the tarball from https://github.com/ollama/ollama/releases)\n' ;;
     *)     printf '  https://ollama.com/download\n' ;;
   esac
 }
@@ -131,7 +131,7 @@ install_ollama_hint() {
 upgrade_ollama_hint() {
   case "$(os_name)" in
     macos) printf '  brew upgrade ollama && brew services restart ollama\n' ;;
-    linux) printf '  curl -fsSL https://ollama.com/install.sh | sh && sudo systemctl restart ollama\n' ;;
+    linux) printf '  curl -fsSL https://ollama.com/install.sh | sh && sudo systemctl restart ollama\n  (needs zstd installed: sudo apt-get install -y zstd)\n' ;;
     *)     printf '  https://ollama.com/download\n' ;;
   esac
 }

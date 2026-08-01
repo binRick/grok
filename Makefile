@@ -6,9 +6,17 @@ SHELL := /bin/bash
 REPO  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 GROK  := $(REPO)/.grok/bin/grok
 
-# Overridable:  make install VERSION=0.2.107 CHANNEL=alpha
+# The grok version this deployment installs. Pinned rather than tracking
+# "latest" so that a clone made months from now gets the same binary this repo
+# was tested against — upstream moves, and `make bootstrap` should be
+# reproducible on a new machine.
+#
+# Moving the pin is a deliberate edit: `make update` installs the newest build
+# and prints the number to paste in here.
+#
+# Overridable per-invocation:  make install VERSION=0.2.107 CHANNEL=alpha
 CHANNEL ?= stable
-VERSION ?=
+VERSION ?= 0.2.118
 
 .DEFAULT_GOAL := help
 
@@ -32,9 +40,14 @@ preflight:
 install:
 	@GROK_CHANNEL=$(CHANNEL) ./install.sh $(VERSION)
 
-## update: re-fetch and install the latest version on $(CHANNEL)
+## update: install the newest build on $(CHANNEL), ignoring the version pin
 update:
-	@GROK_CHANNEL=$(CHANNEL) ./install.sh $(VERSION)
+	@GROK_CHANNEL=$(CHANNEL) GROK_VERSION= ./install.sh
+	@echo ""
+	@echo "Installed $$(cat "$(REPO)/.grok/version" 2>/dev/null), but the Makefile still pins $(VERSION)."
+	@echo "The next 'make install' would put $(VERSION) back. To keep this version,"
+	@echo "set VERSION in the Makefile to:  $$(cat "$(REPO)/.grok/version" 2>/dev/null)"
+	@echo "Then re-verify with:  make ollama-test"
 
 ## run: launch the interactive Grok TUI in the current directory
 run: guard
@@ -103,7 +116,7 @@ help:
 	grep -hE '^## [a-z]' $(MAKEFILE_LIST) \
 	  | sed -E 's/^## ([a-z-]+): /\1|/' \
 	  | awk -F'|' '{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'; \
-	echo; echo "Vars:  CHANNEL=stable|alpha   VERSION=X.Y.Z   (e.g. make install CHANNEL=alpha)"; \
+	echo; echo "Vars:  VERSION=$(VERSION) (pinned in this Makefile)   CHANNEL=$(CHANNEL)"; \
 	echo "       GROK_OLLAMA_MODEL=gemma4:12b  GROK_OLLAMA_CTX=32768   (for make ollama)"
 
 .PHONY: bootstrap preflight install update run login version help-grok doctor \

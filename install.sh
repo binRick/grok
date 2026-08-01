@@ -64,6 +64,16 @@ else
 fi
 
 # --- resolve version ---
+# With no version asked for, fall back to the pin in the Makefile so that
+# `./install.sh` and `make install` install the same build. The Makefile is the
+# single place the pin lives. Setting GROK_VERSION to an empty string (as
+# `make update` does) opts out and tracks the channel's latest instead.
+if [ -z "$TARGET" ] && [ "${GROK_VERSION+set}" != "set" ] && [ -f "$SCRIPT_DIR/Makefile" ]; then
+  TARGET="$(awk -F'\\?=' '/^VERSION[[:space:]]*\?=/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' \
+    "$SCRIPT_DIR/Makefile")"
+  [ -n "$TARGET" ] && info "Using the version pinned in the Makefile: $TARGET"
+fi
+
 if [ -n "$TARGET" ]; then
   version="$TARGET"
 else

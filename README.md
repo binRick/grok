@@ -40,14 +40,19 @@ Building from source is **not** needed here — this uses the signed prebuilt bi
 
 ## Installing
 
-`make install` fetches the latest **stable** release and drops it at `./.grok/bin/grok`. It's idempotent — re-run it any time to upgrade.
+`make install` drops the binary at `./.grok/bin/grok`. It's idempotent — re-run it any time.
+
+The version is **pinned in the Makefile** (`VERSION ?= 0.2.118`) rather than tracking "latest", so a clone made months from now installs the same binary this repo was tested against. If the installed binary has drifted, `make install` puts the pinned one back.
 
 | Command | What it does |
 |---|---|
-| `make install` | Latest stable |
-| `make install VERSION=0.2.106` | Pin a specific version |
+| `make install` | The pinned version |
+| `make install VERSION=0.2.107` | A specific version, this once |
+| `make update` | The newest build, ignoring the pin |
 | `make install CHANNEL=alpha` | Track the faster **alpha** channel |
 | `GROK_BIN_DIR=/somewhere ./install.sh` | Install the symlinks elsewhere |
+
+`./install.sh` reads the same pin, so the no-`make` path installs the same build. `GROK_VERSION= ./install.sh` opts out and tracks the channel's latest.
 
 The binary and its download cache live under `./.grok/` (git-ignored). Nothing is written outside this repo.
 
@@ -247,12 +252,22 @@ Common knobs (under `[ui]`, `[session]`, etc.): `vim_mode`, `screen_mode = "mini
 ## Updating
 
 ```bash
-make update                 # re-fetch the latest stable and swap it in
-make update CHANNEL=alpha   # move to the alpha channel
+make update                 # install the newest stable, ignoring the pin
+make update CHANNEL=alpha   # newest on the alpha channel
 make version                # what's installed now
 ```
 
-`make update` re-runs the installer, so this wrapper always stays in control of the binary. (grok's own `grok update` also works, but for this repo-local layout prefer `make update`.)
+`make update` deliberately ignores the pin and installs the newest build, then prints the version number to paste into the Makefile if you want to keep it. Until you do, the next `make install` restores the pinned version — the pin is the source of truth, not whatever happens to be on disk.
+
+So moving to a new version is two steps, on purpose:
+
+```bash
+make update                 # try it
+make ollama-test            # verify the agent still works on it
+# then edit VERSION in the Makefile, and commit
+```
+
+`make update` re-runs the installer, so this wrapper always stays in control of the binary. (grok's own `grok update` also works, but it would replace the binary behind the pin's back — for this repo-local layout prefer `make update`.)
 
 ---
 
@@ -293,8 +308,8 @@ GROK_HOME="$(pwd)/.grok/home" ./bin/grok
 |---|---|
 | `make bootstrap` | Fresh clone → working local agent (preflight + install + wire up + verify) |
 | `make preflight` | Check the host is ready (installs nothing) |
-| `make install` | Download + install grok into `./.grok/bin` |
-| `make update` | Re-fetch and install the latest version |
+| `make install` | Install the pinned grok version into `./.grok/bin` |
+| `make update` | Install the newest version, ignoring the pin |
 | `make run` | Launch the interactive TUI |
 | `make login` | Authenticate (opens a browser) |
 | `make ollama` | Run grok on a local model via Ollama (pull + wire up + verify) |

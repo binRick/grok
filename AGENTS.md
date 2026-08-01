@@ -23,6 +23,12 @@ points one at the other.
 **End state:** typing `grok` in any project starts an agent driven by local
 gemma4.
 
+The `grok` version is pinned in the Makefile (`VERSION ?= 0.2.118`), so this
+setup is reproducible — every machine that follows this file installs the same
+binary. Do not replace the pin with "latest" to work around a problem; if a
+newer build is needed, run `make update`, verify with `make ollama-test`, then
+edit the pin and commit it.
+
 ## Do this first
 
 ```bash
@@ -229,22 +235,27 @@ First run needs outbound access to:
 After that the setup runs fully offline. If those hosts are blocked, stage both
 artifacts on a connected machine and copy them across.
 
-**The grok binary.** Download it on the connected machine — the URL is
-`https://x.ai/cli/grok-<version>-<platform>`, where platform is one of
+**The grok binary.** Use the pinned version — `grep '^VERSION' Makefile` — so the
+offline install matches everyone else's. Download it on the connected machine
+from `https://x.ai/cli/grok-<version>-<platform>`, where platform is one of
 `macos-aarch64`, `macos-x86_64`, `linux-aarch64`, `linux-x86_64`
 (`https://storage.googleapis.com/grok-build-public-artifacts/cli/...` serves the
 same files). Then, on the target machine:
 
 ```bash
-VERSION=0.2.106 PLATFORM=linux-x86_64          # match what you downloaded
+VERSION=0.2.118 PLATFORM=linux-x86_64          # VERSION must match the Makefile pin
 mkdir -p .grok/downloads .grok/bin
 cp /path/to/grok-$VERSION-$PLATFORM .grok/downloads/grok-$PLATFORM
 chmod +x .grok/downloads/grok-$PLATFORM
 ln -sf "$PWD/.grok/downloads/grok-$PLATFORM" .grok/bin/grok
 ln -sf "$PWD/.grok/downloads/grok-$PLATFORM" .grok/bin/agent
-echo "$VERSION" > .grok/version                # makes install.sh a no-op
+echo "$VERSION" > .grok/version                # matches the pin -> install.sh no-ops
 ./bin/grok --version                           # confirm it runs
 ```
+
+If the stamp does not match the Makefile pin, the next `make install` will try
+to download the pinned version — which fails on an air-gapped host. Keep the two
+in agreement.
 
 **The model.** Ollama has no export command, so copy its store directly. On the
 connected machine run the full `make ollama` first — that creates the derived

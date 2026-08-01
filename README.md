@@ -156,6 +156,8 @@ A local 12B model is not grok-4.5, and it's fair to know that going in. Expect i
 
 That's the characteristic local-model failure: not gibberish, but a confident summary that doesn't match the diff. Treat its report as a claim, not a result. `git diff` after every task, prefer `--permission-mode default` (the one that asks) over `auto` on code you care about, and keep changes small enough to eyeball.
 
+**You want a GPU.** The same 12B model on the same one-line editing task: ~200s on an M4's GPU and correct; ~900s on a 10-core CPU with no GPU, where it announced "I have updated the file" and had changed nothing. On CPU the slowness and the wrongness arrive together. If `ollama ps` says `100% CPU`, drop to a ~4B model (`GROK_OLLAMA_MODEL=gemma4:e4b-it-qat make ollama`) — usable for narrow tasks in a way a 12B is not. `make ollama-test` warns you when a run is slow enough to mean this.
+
 Mixing is fine, and often the right call: the local models sit alongside xAI's in the same picker, so `Ctrl+M` switches between offline and frontier mid-session.
 
 ---

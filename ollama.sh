@@ -528,19 +528,45 @@ cmd_test() {
 
   local tmp
   tmp="$(scratch "$(mktemp -d)")"
-  printf 'the answer is 4711\n' > "$tmp/answer.txt"
+  printf 'retries = 1\nverbose = false\n' > "$tmp/opts.toml"
 
-  info "Agent test: asking $id to read a file with its tools (may take a minute)"
-  local out
-  out="$("$GROK_BIN" --cwd "$tmp" -m "$id" --permission-mode auto --max-turns 6 \
-        -p 'Read the file answer.txt in this directory and reply with only the number it contains.' 2>&1)" \
+  info "Agent test: asking $id to edit a file with its tools (may take a minute)"
+  local out started elapsed
+  started=$SECONDS
+  # The task is deliberately an *edit*, and the verdict comes from the file on
+  # disk rather than from what the model says it did. A local model will report
+  # a successful edit it never made — grading its reply passes in exactly the
+  # case that matters most.
+  out="$("$GROK_BIN" --cwd "$tmp" -m "$id" --permission-mode auto --max-turns 8 \
+        -p 'In opts.toml, change retries from 1 to 5. Leave verbose alone.' 2>&1)" \
         || { printf '%s\n' "$out" >&2; die "grok exited non-zero"; }
+  elapsed=$((SECONDS - started))
 
-  if printf '%s' "$out" | grep -q '4711'; then
-    ok "$id read the file through Grok's tools and answered correctly"
-  else
+  if ! grep -q '^retries = 5' "$tmp/opts.toml"; then
     printf '%s\n' "$out" >&2
-    die "$id did not return the expected value — it may be too small to drive the agent loop"
+    printf 'opts.toml is now:\n' >&2
+    sed 's/^/  /' "$tmp/opts.toml" >&2
+    die "$id did not make the edit (it may still have claimed it did).
+       The model can talk but is not reliably driving the tools. Try a stronger
+       model, or a smaller context if this host is short on memory:
+         GROK_OLLAMA_MODEL=qwen3:14b make ollama"
+  fi
+
+  if ! grep -q '^verbose = false' "$tmp/opts.toml"; then
+    printf 'opts.toml is now:\n' >&2; sed 's/^/  /' "$tmp/opts.toml" >&2
+    die "$id changed the wrong line — it edited verbose, which the prompt told it to leave alone."
+  fi
+
+  ok "$id edited the file correctly through Grok's tools (${elapsed}s)"
+
+  # Calibration: this task runs in ~200s for a 12B on an M4 GPU and ~900s on
+  # CPU-only. The threshold sits between the two, so it flags a host that will
+  # be painful to work on without crying wolf on a merely unhurried one.
+  if [ "$elapsed" -gt 420 ]; then
+    warn "that took ${elapsed}s, which is slow enough to be unpleasant to use."
+    warn "Check whether the model actually fits on the GPU:  ollama ps"
+    warn "If it says CPU, either free up VRAM or drop to a smaller model:"
+    warn "  GROK_OLLAMA_MODEL=gemma4:e4b-it-qat make ollama"
   fi
 }
 

@@ -54,6 +54,7 @@ you can prepare the host up front.
 | **Ollama ≥ 0.30.5** | Older runtimes **cannot load gemma4** | See below |
 | ~13 GB free disk | 7.6 GB model + headroom | `ollama rm <unused-model>` |
 | ~12 GB RAM | Model weights + 32K context | Use a smaller model (below) |
+| **A GPU** (or Apple Silicon) | A 12B model on CPU is ~5x slower and unreliable | See [CPU-only hosts](#cpu-only-hosts) |
 | Network access on first run | Downloads binary + model | See [Restricted networks](#restricted-networks) |
 
 Installing Ollama:
@@ -104,9 +105,14 @@ primary model marked `present`.
 make ollama-test
 ```
 
-This writes a temp file and asks the model to read it **using its tools**.
-Expect: `ok gemma4 read the file through Grok's tools and answered correctly`.
-This is the check that catches a model which talks but cannot act.
+This writes a temp file, asks the model to **edit** it, and then reads the file
+back off disk to decide whether it passed. It deliberately does not grade the
+model's reply — a local model will report an edit it never made, so grading the
+reply passes in exactly the case that matters. Expect:
+`ok gemma4 edited the file correctly through Grok's tools (Ns)`.
+
+If it took more than ~7 minutes the test also warns that the host is too slow to
+work on comfortably. See [CPU-only hosts](#cpu-only-hosts).
 
 **3. It edits real files**
 
@@ -166,6 +172,30 @@ Therefore:
 
 This is a limitation of the model, not of the setup. Larger local models do
 better; see below.
+
+## CPU-only hosts
+
+A plain VM with no GPU — which many managed and compliance-controlled
+environments are — will run this, but not well. Measured on the same 12B model
+and the same editing task:
+
+| Host | Time for one small edit | Outcome |
+|---|---|---|
+| Apple M4, GPU | ~200 s | Correct |
+| 10-core CPU, no GPU | ~900 s | **Claimed success, changed nothing** |
+
+The CPU run is not merely slower. At roughly 1–6 tokens/sec the model produced a
+confident "I have updated the file" while the file was untouched. Slowness and
+wrongness arrive together, which is why `make ollama-test` checks the file
+rather than the reply.
+
+If `ollama ps` shows `100% CPU`, use a small model instead of a large one:
+
+```bash
+GROK_OLLAMA_MODEL=gemma4:e4b-it-qat GROK_OLLAMA_CTX=8192 make ollama
+```
+
+A 4B model on CPU is usable for narrow tasks. A 12B is not.
 
 ## Choosing a different model
 

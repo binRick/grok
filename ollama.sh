@@ -242,7 +242,7 @@ cmd_preflight() {
       printf '%-17s ok (%s GB free; %s needs ~%s GB)\n' "disk:" "$disk" "$MODEL" "$need_gb"
     else
       printf '%-17s \033[33m%s GB free\033[0m — %s needs ~%s GB plus headroom.\n' "disk:" "$disk" "$MODEL" "$need_gb"
-      printf '  Free space, or pick a smaller model:  GROK_OLLAMA_MODEL=gemma4:e4b-it-qat make ollama\n'
+      printf '  Free space, or pick a smaller model:  GROK_OLLAMA_MODEL=qwen3:8b make ollama\n'
       printf '  Reclaim from Ollama:  ollama list   then   ollama rm <model>\n'
       warned=1
     fi
@@ -575,7 +575,7 @@ cmd_test() {
     warn "that took ${elapsed}s, which is slow enough to be unpleasant to use."
     warn "Check whether the model actually fits on the GPU:  ollama ps"
     warn "If it says CPU, either free up VRAM or drop to a smaller model:"
-    warn "  GROK_OLLAMA_MODEL=gemma4:e4b-it-qat make ollama"
+    warn "  GROK_OLLAMA_MODEL=qwen3:8b make ollama"
   fi
 }
 

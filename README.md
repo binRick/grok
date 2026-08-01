@@ -158,6 +158,8 @@ That's the characteristic local-model failure: not gibberish, but a confident su
 
 **You want a GPU.** The same one-line editing task took ~200s on an M4's GPU and 640–1028s on a 10-core CPU with no GPU, and that cost is paid again on every turn. Worse, grok abandons a turn after 600s of silence from the model — a cloud-latency assumption that a CPU host blows through during prompt processing, before a single token appears. On a CPU-only box that killed *every* turn, including the one inside `make bootstrap`. The generated config now sets `inference_idle_timeout_secs = 1800` to compensate; `GROK_OLLAMA_IDLE_TIMEOUT=3600 make ollama` goes further. A smaller model does not fix this on its own — what matters is the length of the silence, not the tokens per second.
 
+**Smaller is not simply worse — but most small models don't work at all.** Advertised tool support isn't usable tool support: `qwen3:8b` (5.2 GB) passes the edit test in 152s, beating the 7.6 GB default on both size and speed, while `gemma4:e4b-it-qat`, `llama3.2:3b` and `qwen2.5-coder:3b` all fail — they answer in prose about the edit rather than making it. Around 8B is the floor. `./ollama.sh test <model-id>` settles it in a couple of minutes, so test before trusting.
+
 Mixing is fine, and often the right call: the local models sit alongside xAI's in the same picker, so `Ctrl+M` switches between offline and frontier mid-session.
 
 ---

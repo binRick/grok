@@ -182,8 +182,8 @@ editing task, 10 CPU cores, no GPU:
 | Host | Model | Time |
 |---|---|---|
 | Apple M4, GPU | gemma4:12b | ~200 s |
+| Apple M4, GPU | qwen3:8b | ~152 s |
 | 10-core CPU | gemma4:12b | 640–900 s |
-| 10-core CPU | gemma4:e4b-it-qat | 675–1028 s |
 
 Roughly 1–6 tokens/sec, and it compounds: every turn of a multi-step task pays
 it again.
@@ -198,9 +198,8 @@ Internal error: "inference idle timeout after 600s with no chunks"
 ```
 
 On a CPU-only box this hit every single turn, including the one inside
-`make bootstrap`, which failed. Note that a *smaller* model did not help — e4b
-timed out where the 12B had squeaked through, because what matters is the length
-of the silence, not the tokens per second.
+`make bootstrap`, which failed. A *smaller* model did not help — what matters is
+the length of the silence, not the tokens per second.
 
 The generated config therefore sets `inference_idle_timeout_secs = 1800` on
 every model. Raise it further on a very slow host:
@@ -209,23 +208,48 @@ every model. Raise it further on a very slow host:
 GROK_OLLAMA_IDLE_TIMEOUT=3600 make ollama
 ```
 
-With that in place a CPU host works — slowly. If you want it merely slow rather
-than unusable, a smaller model and context still helps:
-
-```bash
-GROK_OLLAMA_MODEL=gemma4:e4b-it-qat GROK_OLLAMA_CTX=8192 make ollama
-```
+With that in place a CPU host works — slowly. To make it lighter, change the
+model rather than shrinking the one you have; see the table below for which ones
+actually work.
 
 One CPU run also reported an edit it had not made — but the same failure has
 been seen on GPU, so treat it as the model being unreliable rather than as
 something CPU causes. It is why `make ollama-test` checks the file, not the
 reply.
 
+## Which models actually work
+
+Advertised tool support is not the same as usable tool support. Every model
+below lists `tools` in `ollama show`, yet most of them will not drive the agent.
+Measured with `make ollama-test` (edit a file, verified on disk):
+
+| Model | Size | Works? |
+|---|---|---|
+| `qwen3:8b` | 5.2 GB | **Yes** — 152 s, the best small option |
+| `gemma4:12b` | 7.6 GB | **Yes** — 200 s, the default |
+| `qwen3:14b` | 9.3 GB | Yes |
+| `gemma4:e4b-it-qat` | 6.1 GB | **No** — asks you to paste the file instead of reading it |
+| `llama3.2:3b` | 2.0 GB | No |
+| `qwen2.5-coder:3b` | 1.9 GB | No |
+
+The failures are not marginal. Asked to edit a file, `gemma4:e4b-it-qat`
+replied: *"Could you please provide the current content of opts.toml?"* — it had
+a read tool and asked the user to do it instead. That is the same on GPU as on
+CPU, so it is the model, not the hardware.
+
+**Roughly 8B is the floor** for driving this agent at all. Below that, models
+answer in prose about the edit they would make. If you need something smaller
+than `qwen3:8b`, test it before trusting it:
+
+```bash
+ollama pull <model> && make ollama-models && ./ollama.sh test ollama-<model-slug>
+```
+
 ## Choosing a different model
 
 ```bash
 GROK_OLLAMA_MODEL=gemma4:26b       make ollama   # stronger, needs ~18 GB disk + ~24 GB RAM
-GROK_OLLAMA_MODEL=gemma4:e4b-it-qat make ollama  # lighter, ~6 GB
+GROK_OLLAMA_MODEL=qwen3:8b          make ollama  # lighter (5.2 GB) and faster
 GROK_OLLAMA_MODEL=qwen3:14b        make ollama   # non-gemma alternative
 GROK_OLLAMA_CTX=65536              make ollama   # larger context, more RAM
 ```

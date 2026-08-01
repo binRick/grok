@@ -257,6 +257,10 @@ cmd_preflight() {
   # --- grok itself ---
   if [ -x "$GROK_BIN" ]; then
     printf '%-17s ok (%s)\n' "grok binary:" "$("$GROK_BIN" --version 2>/dev/null)"
+  elif [ "${GROK_OLLAMA_BOOTSTRAP:-0}" = "1" ]; then
+    # `make bootstrap` installs it in the very next step, so its absence here is
+    # the expected starting state, not something to warn a new user about.
+    printf '%-17s not installed yet — bootstrap installs it next\n' "grok binary:"
   else
     printf '%-17s \033[33mnot installed\033[0m — run: make install\n' "grok binary:"
     warned=1
@@ -569,8 +573,12 @@ cmd_doctor() {
 }
 
 cmd_setup() {
-  cmd_preflight
-  echo >&2
+  # `make bootstrap` preflights before installing anything, so running it again
+  # here would just repeat the same report back at the user.
+  if [ "${GROK_OLLAMA_BOOTSTRAP:-0}" != "1" ]; then
+    cmd_preflight
+    echo >&2
+  fi
   cmd_pull
   cmd_generate
   cmd_install

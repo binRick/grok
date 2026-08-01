@@ -22,13 +22,15 @@ VERSION ?= 0.2.118
 
 ## bootstrap: fresh clone -> working local agent (preflight + grok + gemma4 + verify)
 bootstrap:
-	@./ollama.sh preflight || { \
+	@GROK_OLLAMA_BOOTSTRAP=1 ./ollama.sh preflight || { \
 	  echo ""; \
 	  echo "Fix the items above first. Nothing has been installed."; \
 	  exit 1; \
 	}
+	@echo ""
 	@$(MAKE) --no-print-directory install
-	@./ollama.sh setup
+	@echo ""
+	@GROK_OLLAMA_BOOTSTRAP=1 ./ollama.sh setup
 	@echo ""
 	@echo "Ready. Start the agent with:  make run"
 

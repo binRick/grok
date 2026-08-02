@@ -113,6 +113,8 @@ make run          # …and you're driving a local model
 Already have the binary? `make ollama` does just the model half.
 
 > Setting this up on another machine — or handing it to a coding agent to set up — is covered step by step in **[AGENTS.md](AGENTS.md)**, including verification, restricted networks, and offline installs. Grok itself loads that file as project rules, so the local agent knows how its own setup works.
+>
+> **[VERIFICATION.md](VERIFICATION.md)** is the companion to it: exactly what was tested, on which hardware, the defects that testing turned up — and the things that were never tested and may well break on a locked-down machine.
 
 `make ollama` is idempotent, and it verifies rather than assumes: the last step runs an actual agentic turn (the model must use its tools to read a file and report what's inside) and fails loudly if the model can't.
 
@@ -158,7 +160,7 @@ That's the characteristic local-model failure: not gibberish, but a confident su
 
 **You want a GPU.** The same one-line editing task took ~200s on an M4's GPU and 640–1028s on a 10-core CPU with no GPU, and that cost is paid again on every turn. Worse, grok abandons a turn after 600s of silence from the model — a cloud-latency assumption that a CPU host blows through during prompt processing, before a single token appears. On a CPU-only box that killed *every* turn, including the one inside `make bootstrap`. The generated config now sets `inference_idle_timeout_secs = 1800` to compensate; `GROK_OLLAMA_IDLE_TIMEOUT=3600 make ollama` goes further. A smaller model does not fix this on its own — what matters is the length of the silence, not the tokens per second.
 
-**Smaller is not simply worse — but most small models don't work at all.** Advertised tool support isn't usable tool support: `qwen3:8b` (5.2 GB) passes the edit test in 152s, beating the 7.6 GB default on both size and speed, while `gemma4:e4b-it-qat`, `llama3.2:3b` and `qwen2.5-coder:3b` all fail — they answer in prose about the edit rather than making it. Around 8B is the floor. `./ollama.sh test <model-id>` settles it in a couple of minutes, so test before trusting.
+**Smaller is not simply worse — but most small models don't work at all.** Advertised tool support isn't usable tool support: `qwen3:8b` (5.2 GB) passes the edit test in 152s, beating the 7.6 GB default on both size and speed, while `gemma4:e4b-it-qat`, `llama3.2:3b` and `qwen2.5-coder:3b` all fail — they answer in prose about the edit rather than making it. Around 8B is the floor. Bigger isn't a free win either: `qwen3:14b` passes, but takes 389s to do the same edit. `./ollama.sh test <model-id>` settles it in a couple of minutes, so test before trusting.
 
 Mixing is fine, and often the right call: the local models sit alongside xAI's in the same picker, so `Ctrl+M` switches between offline and frontier mid-session.
 
@@ -295,6 +297,7 @@ Because the wrapper is non-invasive, that's all there is to remove. If you also 
 ├── bin/grok       # launcher shim → runs the installed binary
 ├── Makefile       # make bootstrap / install / run / ollama / doctor / uninstall
 ├── AGENTS.md      # setup guide for another machine or a coding agent
+├── VERIFICATION.md # what was tested, what wasn't, and how to re-check it
 ├── README.md      # this file
 └── .grok/         # (git-ignored) the downloaded binary + cache
 ```

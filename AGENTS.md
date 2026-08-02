@@ -3,6 +3,11 @@
 Instructions for an AI agent (or a person) bringing this repo up on a new
 machine. Follow it top to bottom. Every command is safe to re-run.
 
+**If you are here to check whether these claims are true**, read
+[VERIFICATION.md](VERIFICATION.md) instead. It lists what was actually tested
+and on what hardware, the defects that testing found, and — more useful — the
+things that were *never* tested and could well fail on a managed work machine.
+
 ## What you are building
 
 A terminal coding agent — reads a codebase, edits files, runs shell commands —
@@ -70,7 +75,11 @@ curl -fsSL https://ollama.com/install.sh | sh && sudo systemctl start ollama
 
 A minimal Linux image (a slim container, a fresh VM) will not have `zstd`, and
 the installer fails with `ERROR: This version requires zstd for extraction`
-rather than anything about Ollama. Verified on `debian:12-slim`.
+rather than anything about Ollama. Verified on `debian:12-slim`. The reason is
+that Ollama ships its Linux builds as `.tar.zst` — `ollama-linux-amd64.tar.zst`
+and `ollama-linux-arm64.tar.zst` are the only Linux artifacts on the release,
+so there is no gzip fallback to fall back to. macOS is unaffected; its artifact
+is a plain `.tgz`.
 
 Upgrading it (the **server** version is what matters, so restart it after):
 
@@ -181,8 +190,9 @@ editing task, 10 CPU cores, no GPU:
 
 | Host | Model | Time |
 |---|---|---|
-| Apple M4, GPU | gemma4:12b | ~200 s |
 | Apple M4, GPU | qwen3:8b | ~152 s |
+| Apple M4, GPU | gemma4:12b | ~200 s |
+| Apple M4, GPU | qwen3:14b | ~389 s |
 | 10-core CPU | gemma4:12b | 640–900 s |
 
 Roughly 1–6 tokens/sec, and it compounds: every turn of a multi-step task pays
@@ -227,7 +237,7 @@ Measured with `make ollama-test` (edit a file, verified on disk):
 |---|---|---|
 | `qwen3:8b` | 5.2 GB | **Yes** — 152 s, the best small option |
 | `gemma4:12b` | 7.6 GB | **Yes** — 200 s, the default |
-| `qwen3:14b` | 9.3 GB | Yes |
+| `qwen3:14b` | 9.3 GB | **Yes** — 389 s, noticeably slower than the default |
 | `gemma4:e4b-it-qat` | 6.1 GB | **No** — asks you to paste the file instead of reading it |
 | `llama3.2:3b` | 2.0 GB | No |
 | `qwen2.5-coder:3b` | 1.9 GB | No |
@@ -369,6 +379,58 @@ telemetry = false
 auto_update = false
 ```
 
+## Managed and locked-down hosts
+
+A corporate or compliance-controlled machine differs from the hosts this was
+tested on in three ways that matter. None of these were verified here — see
+[VERIFICATION.md](VERIFICATION.md#what-was-not-tested) — so treat this section
+as a starting point and check the result rather than assuming it worked.
+
+**Behind a proxy.** Both the binary download and the model pull are plain HTTPS
+and honour the standard variables. Export them before anything else:
+
+```bash
+export HTTPS_PROXY=http://proxy.corp:8080 HTTP_PROXY=http://proxy.corp:8080
+export NO_PROXY=localhost,127.0.0.1        # keep Ollama traffic off the proxy
+make bootstrap
+```
+
+`NO_PROXY` matters: without it, requests to `localhost:11434` may be routed to
+the proxy and fail once the model is running. If the proxy does TLS
+interception, `curl` needs the corporate CA in its trust store, and Ollama —
+being a separate process — may need `SSL_CERT_FILE` pointing at it.
+
+**Without root.** Ollama's installer wants root and installs a systemd unit.
+There is no supported user-local install, but the release archive can be
+unpacked into `$HOME` and the server run as an ordinary process:
+
+```bash
+sudo apt-get install -y zstd     # or any user-local zstd — see the note below
+curl -fsSL https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst \
+  | tar --use-compress-program=unzstd -x -C ~/.local     # ollama-linux-arm64… on arm
+export PATH="$HOME/.local/bin:$PATH"
+ollama serve > ~/ollama.log 2>&1 &
+ollama --version                 # then carry on with: make bootstrap
+```
+
+That archive is ~1.4 GB — it bundles the GPU runtimes. The server must stay
+running for the whole session; it is not a one-shot command.
+
+Everything else here is unprivileged already: the `grok` binary installs into
+`./.grok/` inside the repo and the config goes to `$HOME`. Ollama is the only
+part that wants root.
+
+**If neither works**, the model cannot be served locally on that machine, and
+this repo has nothing to offer it. That is a real possible outcome; the answer
+is a host you can run a daemon on, not a smaller model.
+
+## Checking a claim that this already works
+
+If you are told this repo is "set up and working", the check is
+[VERIFICATION.md](VERIFICATION.md#the-90-second-check): `make ollama-doctor`
+then `make ollama-test`. Doctor alone is not enough — a model that cannot use
+tools passes doctor and fails every real task.
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |
@@ -402,4 +464,5 @@ bootstrap →  make bootstrap    one command, fresh clone to working agent
              bin/grok          launcher shim
              Makefile          all entry points — `make help` lists them
              README.md         human-facing documentation
+             VERIFICATION.md   what was tested, what was not, how to re-check
 ```
